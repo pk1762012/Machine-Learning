@@ -17,7 +17,7 @@ from sklearn.tree import plot_tree
 
 # col_names = ['pregnant', 'glucose', 'bp', 'skin', 'insulin', 'bmi', 'pedigree', 'age', 'label']
 # load dataset
-file = pd.read_csv("diabetes.csv")
+file = pd.read_csv("files_saved/diabetes.csv")
 
 feature_cols = ['Pregnancies', 'Insulin', 'BMI', 'Age', 'Glucose', 'BloodPressure', 'DiabetesPedigreeFunction']
 X = file[feature_cols]
