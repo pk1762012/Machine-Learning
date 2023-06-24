@@ -1,0 +1,16 @@
+The objective is to create a classification model to find whether the target variable named as 'target' is a fraud (class 1) or not a fraud (class 0)
+The classification model will be built using multiple other variables, also called features.
+There are around 1000s of features, out of which 10% are categorical features and rest are continuous features.
+For all the features, please create automated categories/bins - for each of these, create an WOE values.
+While creating these automated categories, ensure that outliers in continuous variables are assigned to one category, and missing values are assigned another category.
+The WOE values for each categories should at least be 15% different from the nearest categories, if not, combine the adjacent categories with less than 15% difference and create WOE based on combined categories.
+Calculate the Information Value for each of the variables, and save in a csv the information value for each of the variables.
+Select the top 100 variables using the top information values and remove all variables with 0 IV.
+Remember that features do not need any further NLP related tuning or cleaning, hence there is no need to use BERT or NLP processing.
+Downsampling has already been done on the data, there is no need to down or up sample.
+Missing value treatment is based on missing value WOE for each of the variable.
+Next, create a classification model (use a train test split of 70-30) using the 'target' variable as the target, and the other top 100 variables selected based on above exercise.
+This classification model should be based on XGBoost with GPU mode and should have hyperparameter tuning using bayseian optimization.
+Check the performance of the model using AUC, confusion matrix, and Transaction Detection Rate (TDR - commonly used in fraud modelling).
+The final model should be saved as a pickle or joblib file.
+There is no need to create any web app, we will run code from back end. Hence, no need to provide any front end and login codes.
