@@ -19,7 +19,7 @@ class XGBoostModel:
                       'eta': 0.1,
                       'gamma': gamma,
                       'colsample_bytree': colsample_bytree}
-            cv_result = xgb.cv(params, xgb.DMatrix(self.X_train, label=self.y_train), num_boost_round=1000, nfold=5)
+            cv_result = xgb.cv(params, xgb.DMatrix(self.X_train, label=self.y_train, enable_categorical=True), num_boost_round=1000, nfold=5)
             return cv_result['test-auc-mean'].iloc[-1]
         
         from bayes_opt import BayesianOptimization

@@ -6,10 +6,11 @@ from sklearn.utils import resample
 from scipy.stats import chi2_contingency
 
 class DataPreprocessing:
-    def __init__(self, data):
+    def __init__(self, data, data_columns):
         self.data = data
+        self.data_col = data_columns
     
-    def create_categories(self, col, num_bins=10):
+    def create_categories(self, col, target, num_bins=10):
         """
         Create automated categories/bins for a given column.
         Outliers are assigned to one category, and missing values are assigned another category.
@@ -17,20 +18,31 @@ class DataPreprocessing:
         # Handle missing values
         self.data[col+'_missing'] = np.where(self.data[col].isnull(), 1, 0)
         self.data[col].fillna(-999, inplace=True)
-        
-        # Handle outliers
-        q1 = self.data[col].quantile(0.25)
-        q3 = self.data[col].quantile(0.75)
-        iqr = q3 - q1
-        lower_bound = q1 - 1.5*iqr
-        upper_bound = q3 + 1.5*iqr
-        self.data[col+'_outlier'] = np.where((self.data[col] < lower_bound) | (self.data[col] > upper_bound), 1, 0)
-        self.data[col] = np.where((self.data[col] < lower_bound) | (self.data[col] > upper_bound), -999, self.data[col])
-        
+
+        # if not self.data[col].dtype == 'object':
+        #     # Handle outliers
+        #     q1 = self.data[col].quantile(0.25)
+        #     q3 = self.data[col].quantile(0.75)
+        #     iqr = q3 - q1
+        #     lower_bound = q1 - 1.5*iqr
+        #     upper_bound = q3 + 1.5*iqr
+        #     self.data[col+'_outlier'] = np.where((self.data[col] < lower_bound) | (self.data[col] > upper_bound), 1, 0)
+        #     self.data[col] = np.where((self.data[col] < lower_bound), lower_bound, self.data[col])
+        #     self.data[col] = np.where((self.data[col] > upper_bound), upper_bound, self.data[col])
+
+
         # Create categories
-        self.data[col+'_bin'] = pd.qcut(self.data[col], num_bins, duplicates='drop')
-        self.data[col+'_bin'] = self.data[col+'_bin'].astype(str)
-        
+        woe_values = []
+
+        for col in self.data_col:
+            if col != target:
+                self.data[col + '_bin'] = pd.qcut(self.data[col], num_bins, duplicates='drop')
+                self.data[col + '_bin'] = self.data[col + '_bin'].astype(str)
+                woe_dict = self.calculate_woe(col + '_bin', target)
+                woe_values.extend([(col + '_bin', category, woe) for category, woe in woe_dict.items()])
+
+        woe_df = pd.DataFrame(woe_values, columns=['Variable', 'Bin', 'WOE'])
+
     def calculate_woe(self, col, target):
         """
         Calculate WOE values for each category of a given column.
@@ -42,34 +54,46 @@ class DataPreprocessing:
         grouped['good'] = grouped['total'] - grouped['bad']
         grouped['woe'] = np.log((grouped['good']/total_good) / (grouped['bad']/total_bad))
         return grouped['woe'].to_dict()
-    
+
     def calculate_iv(self, feature_column, target_column):
         """
         Calculate Information Value for a given column.
         """
 
-        grouped = self.data.groupby(feature_column)[target_column].agg(['count', 'sum'])
-        grouped['non_event'] = grouped['count'] - grouped['sum']
-        grouped['event_rate'] = grouped['sum'] / grouped['sum'].sum()
-        grouped['non_event_rate'] = grouped['non_event'] / grouped['non_event'].sum()
+        self.data['sum'] = self.data.groupby(feature_column)[target_column].transform('sum')
+        self.data['count'] = self.data.groupby(feature_column)[target_column].transform('count')
+        self.data['non_event'] = self.data['count'] - self.data['sum']
+        self.data['event_rate'] = self.data['sum'] / self.data['sum'].sum()
+        self.data['non_event_rate'] = self.data['non_event'] / self.data['non_event'].sum()
+
+        grouped = self.data.groupby(feature_column).agg({
+            target_column: 'sum',
+            'count': 'first',
+            'non_event': 'sum',
+            'event_rate': 'mean',
+            'non_event_rate': 'mean'
+        })
+
         grouped['woe'] = np.log(grouped['event_rate'] / grouped['non_event_rate'])
         grouped['iv'] = (grouped['event_rate'] - grouped['non_event_rate']) * grouped['woe']
         iv = grouped['iv'].sum()
+
         return iv
-    
+
     def select_top_variables(self, target, num_vars=100):
         """
         Select top variables based on Information Value.
         """
         iv = []
-        for col in self.data.columns:
+
+        for col in self.data_col:
             if col != target:
-                iv.append((col, self.calculate_iv(col, target)))
+                iv.append((col+'_bin', self.calculate_iv(col+'_bin', target)))
         iv_df = pd.DataFrame(iv, columns=['Variable', 'IV'])
         iv_df = iv_df.sort_values('IV', ascending=False).reset_index(drop=True)
         top_vars = iv_df['Variable'][:num_vars]
-        self.data = self.data[top_vars.append(pd.Index([target]))]
-    
+        self.data = self.data[pd.concat([top_vars, pd.Series([target])], ignore_index=True)]
+
     def split_data(self, target, test_size=0.3):
         """
         Split data into train and test sets.
