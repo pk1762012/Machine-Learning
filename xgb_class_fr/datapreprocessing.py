@@ -43,18 +43,19 @@ class DataPreprocessing:
         grouped['woe'] = np.log((grouped['good']/total_good) / (grouped['bad']/total_bad))
         return grouped['woe'].to_dict()
     
-    def calculate_iv(self, col, target):
+    def calculate_iv(self, feature_column, target_column):
         """
         Calculate Information Value for a given column.
         """
-        total_good = self.data[target].value_counts()[0]
-        total_bad = self.data[target].value_counts()[1]
-        grouped = self.data.groupby(col+'_bin').agg({target: ['count', 'sum']})
-        grouped.columns = ['total', 'bad']
-        grouped['good'] = grouped['total'] - grouped['bad']
-        grouped['woe'] = np.log((grouped['good']/total_good) / (grouped['bad']/total_bad))
-        grouped['iv'] = (grouped['good']/total_good - grouped['bad']/total_bad) * grouped['woe']
-        return grouped['iv'].sum()
+
+        grouped = self.data.groupby(feature_column)[target_column].agg(['count', 'sum'])
+        grouped['non_event'] = grouped['count'] - grouped['sum']
+        grouped['event_rate'] = grouped['sum'] / grouped['sum'].sum()
+        grouped['non_event_rate'] = grouped['non_event'] / grouped['non_event'].sum()
+        grouped['woe'] = np.log(grouped['event_rate'] / grouped['non_event_rate'])
+        grouped['iv'] = (grouped['event_rate'] - grouped['non_event_rate']) * grouped['woe']
+        iv = grouped['iv'].sum()
+        return iv
     
     def select_top_variables(self, target, num_vars=100):
         """
