@@ -38,10 +38,12 @@ class DataPreprocessing:
             if col != target:
                 self.data[col + '_bin'] = pd.qcut(self.data[col], num_bins, duplicates='drop')
                 self.data[col + '_bin'] = self.data[col + '_bin'].astype(str)
-                woe_dict = self.calculate_woe(col + '_bin', target)
+                woe_dict = self.calculate_woe(col, target)
                 woe_values.extend([(col + '_bin', category, woe) for category, woe in woe_dict.items()])
 
         woe_df = pd.DataFrame(woe_values, columns=['Variable', 'Bin', 'WOE'])
+        self.df = woe_df.pivot(index='Variable', columns='Bin', values='WOE').reset_index()
+        self.df.columns.name = None
 
     def calculate_woe(self, col, target):
         """
